@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class TabelaService {
@@ -20,6 +21,8 @@ public class TabelaService {
     @Autowired
     private GameService gameService;
 
+    @Autowired
+    private TabelaRepository tabelaRepository;
     public List<TimeDTO> getTabela() {
 
         List<TeamReturnDTO> times = teamService.listTeams();
@@ -97,12 +100,45 @@ public class TabelaService {
     }
 
     private boolean verificaEmpates(TeamReturnDTO time, Game game) {
-        if (game.getScoreHome() == game.getScoreAway()) {
-            return true;
-        }
-        return false;
+        return Objects.equals(game.getScoreHome(), game.getScoreAway());
     }
 
+    public void updateTabelaForGame(Game game) {
+        // Atualizando para o time da casa
+        Tabela timeCasa = tabelaRepository.findByNome(game.getHome());
+        if (timeCasa == null) {
+            timeCasa = new Tabela();
+            timeCasa.setNome(game.getHome());
+        }
+        atualizaDadosTabelaComBaseNoJogo(timeCasa, game.getScoreHome(), game.getScoreAway());
 
+        // Atualizando para o time visitante
+        Tabela timeVisitante = tabelaRepository.findByNome(game.getAway());
+        if (timeVisitante == null) {
+            timeVisitante = new Tabela();
+            timeVisitante.setNome(game.getAway());
+        }
+        atualizaDadosTabelaComBaseNoJogo(timeVisitante, game.getScoreAway(), game.getScoreHome());
+
+        // Salve as atualizações no banco de dados
+        tabelaRepository.save(timeCasa);
+        tabelaRepository.save(timeVisitante);
+    }
+
+    private void atualizaDadosTabelaComBaseNoJogo(Tabela time, int golsFeitos, int golsSofridos) {
+        time.setJogos(time.getJogos() + 1);
+        time.setGolsPro(time.getGolsPro() + golsFeitos);
+        time.setGolsContra(time.getGolsContra() + golsSofridos);
+
+        if (golsFeitos > golsSofridos) {
+            time.setVitorias(time.getVitorias() + 1);
+            time.setPontos(time.getPontos() + 3);
+        } else if (golsFeitos < golsSofridos) {
+            time.setDerrotas(time.getDerrotas() + 1);
+        } else {
+            time.setEmpates(time.getEmpates() + 1);
+            time.setPontos(time.getPontos() + 1);
+        }
+    }
 
 }
